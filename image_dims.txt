@@ -1,0 +1,2 @@
+d:\GodotPro\aarpg\Assets\player_updates\sprites\player_sprite.png 1024x512
+d:\GodotPro\aarpg\Assets\ExamplePlayerSprite.png 840x64
