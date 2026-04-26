@@ -1,0 +1,175 @@
+[gd_scene load_steps=10 format=3]
+
+[ext_resource type="Texture2D" path="res://Assets/Slime.png" id="1_slime"]
+[ext_resource type="Texture2D" uid="uid://bp3xmqstgm3df" path="res://Assets/Shadow.png" id="2_shadow"]
+[ext_resource type="Script" path="res://Enemy/Scripts/slime_enemy.gd" id="3_script"]
+[ext_resource type="PackedScene" path="res://GeneralNodes/HitBox/hurt_box.tscn" id="4_hurt"]
+[ext_resource type="PackedScene" path="res://GeneralNodes/HitBox/hit_box.tscn" id="5_hit"]
+
+[sub_resource type="CapsuleShape2D" id="CapsuleShape2D_slime"]
+radius = 10.0
+height = 24.0
+
+[sub_resource type="Animation" id="Animation_reset"]
+length = 0.001
+tracks/0/type = "value"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath("Sprite2D:frame")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0),
+"transitions": PackedFloat32Array(1),
+"update": 1,
+"values": [0]
+}
+tracks/1/type = "value"
+tracks/1/imported = false
+tracks/1/enabled = true
+tracks/1/path = NodePath("Sprite2D:position")
+tracks/1/interp = 1
+tracks/1/loop_wrap = true
+tracks/1/keys = {
+"times": PackedFloat32Array(0),
+"transitions": PackedFloat32Array(1),
+"update": 1,
+"values": [Vector2(0, -2)]
+}
+tracks/2/type = "value"
+tracks/2/imported = false
+tracks/2/enabled = true
+tracks/2/path = NodePath("ShadowSprite2D:scale")
+tracks/2/interp = 1
+tracks/2/loop_wrap = true
+tracks/2/keys = {
+"times": PackedFloat32Array(0),
+"transitions": PackedFloat32Array(1),
+"update": 1,
+"values": [Vector2(0.95, 0.72)]
+}
+
+[sub_resource type="Animation" id="Animation_idle"]
+resource_name = "idle"
+length = 0.6
+loop_mode = 2
+tracks/0/type = "value"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath("Sprite2D:frame")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0, 0.2, 0.4, 0.6),
+"transitions": PackedFloat32Array(1, 1.4, 1.4, 1),
+"update": 1,
+"values": [0, 8, 0, 9]
+}
+tracks/1/type = "value"
+tracks/1/imported = false
+tracks/1/enabled = true
+tracks/1/path = NodePath("Sprite2D:position")
+tracks/1/interp = 1
+tracks/1/loop_wrap = true
+tracks/1/keys = {
+"times": PackedFloat32Array(0, 0.2, 0.4, 0.6),
+"transitions": PackedFloat32Array(1, 1.2, 1.2, 1),
+"update": 1,
+"values": [Vector2(0, -2), Vector2(0, -1), Vector2(0, -3), Vector2(0, -2)]
+}
+tracks/2/type = "value"
+tracks/2/imported = false
+tracks/2/enabled = true
+tracks/2/path = NodePath("ShadowSprite2D:scale")
+tracks/2/interp = 1
+tracks/2/loop_wrap = true
+tracks/2/keys = {
+"times": PackedFloat32Array(0, 0.2, 0.4, 0.6),
+"transitions": PackedFloat32Array(1, 1.1, 1.1, 1),
+"update": 1,
+"values": [Vector2(0.95, 0.72), Vector2(0.99, 0.69), Vector2(0.92, 0.74), Vector2(0.95, 0.72)]
+}
+
+[sub_resource type="Animation" id="Animation_hop"]
+resource_name = "hop"
+length = 0.32
+tracks/0/type = "value"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath("Sprite2D:frame")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0, 0.08, 0.16, 0.24, 0.32),
+"transitions": PackedFloat32Array(1, 1, 1, 1, 1),
+"update": 1,
+"values": [9, 11, 12, 15, 0]
+}
+tracks/1/type = "value"
+tracks/1/imported = false
+tracks/1/enabled = true
+tracks/1/path = NodePath("Sprite2D:position")
+tracks/1/interp = 1
+tracks/1/loop_wrap = true
+tracks/1/keys = {
+"times": PackedFloat32Array(0, 0.08, 0.16, 0.24, 0.32),
+"transitions": PackedFloat32Array(1, 1.8, 1.2, 0.9, 1),
+"update": 1,
+"values": [Vector2(0, -2), Vector2(0, 2), Vector2(0, -20), Vector2(0, -10), Vector2(0, -2)]
+}
+tracks/2/type = "value"
+tracks/2/imported = false
+tracks/2/enabled = true
+tracks/2/path = NodePath("ShadowSprite2D:scale")
+tracks/2/interp = 1
+tracks/2/loop_wrap = true
+tracks/2/keys = {
+"times": PackedFloat32Array(0, 0.08, 0.16, 0.24, 0.32),
+"transitions": PackedFloat32Array(1, 1.4, 1.2, 1, 1),
+"update": 1,
+"values": [Vector2(0.95, 0.72), Vector2(1.12, 0.58), Vector2(0.78, 0.44), Vector2(0.88, 0.56), Vector2(0.95, 0.72)]
+}
+
+[sub_resource type="AnimationLibrary" id="AnimationLibrary_slime"]
+_data = {
+&"RESET": SubResource("Animation_reset"),
+&"hop": SubResource("Animation_hop"),
+&"idle": SubResource("Animation_idle")
+}
+
+[node name="Slime" type="CharacterBody2D"]
+collision_mask = 16
+script = ExtResource("3_script")
+
+[node name="ShadowSprite2D" type="Sprite2D" parent="."]
+modulate = Color(0, 0, 0, 0.62)
+show_behind_parent = true
+z_index = -1
+position = Vector2(0, 14)
+scale = Vector2(0.95, 0.72)
+texture = ExtResource("2_shadow")
+
+[node name="Sprite2D" type="Sprite2D" parent="."]
+position = Vector2(0, -2)
+texture = ExtResource("1_slime")
+hframes = 16
+vframes = 2
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+position = Vector2(0, 4)
+rotation = 1.5708
+shape = SubResource("CapsuleShape2D_slime")
+
+[node name="HurtBox" parent="." instance=ExtResource("4_hurt")]
+team = &"enemy"
+shape_radius = 11.0
+shape_offset = Vector2(0, 1)
+
+[node name="AttackHitBox" parent="." instance=ExtResource("5_hit")]
+team = &"enemy"
+damage = 1
+box_size = Vector2(22, 18)
+box_offset = Vector2(0, 4)
+
+[node name="AnimationPlayer" type="AnimationPlayer" parent="."]
+libraries/ = SubResource("AnimationLibrary_slime")

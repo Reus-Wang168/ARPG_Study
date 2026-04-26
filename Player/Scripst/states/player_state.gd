@@ -5,9 +5,9 @@ var player
 var state_machine: PlayerStateMachine
 
 
-func Initialize(owner, owner_state_machine: PlayerStateMachine) -> void:
-	player = owner
-	state_machine = owner_state_machine
+func Initialize(player_owner, player_state_machine: PlayerStateMachine) -> void:
+	player = player_owner
+	state_machine = player_state_machine
 
 
 func Enter() -> void:

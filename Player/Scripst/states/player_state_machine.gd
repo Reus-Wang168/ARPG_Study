@@ -7,8 +7,8 @@ var previous_state: State
 var current_state: State
 
 
-func Initialize(owner) -> void:
-	player = owner
+func Initialize(player_owner) -> void:
+	player = player_owner
 	states.clear()
 	previous_state = null
 	current_state = null

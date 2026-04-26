@@ -5,7 +5,13 @@ extends State
 func Enter() -> void:
 	player.velocity = Vector2.ZERO
 	if player != null:
+		player.SetAttackHitBoxEnabled(true)
 		player.PlayAttackSound()
+
+
+func Exit() -> void:
+	if player != null:
+		player.SetAttackHitBoxEnabled(false)
 
 
 func PhysicsUpdate(_delta: float) -> void:
