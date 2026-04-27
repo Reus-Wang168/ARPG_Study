@@ -12,6 +12,7 @@
 [ext_resource type="PackedScene" path="res://GeneralNodes/HitBox/hurt_box.tscn" id="9_hurtb"]
 [ext_resource type="PackedScene" path="res://GeneralNodes/HitBox/hit_box.tscn" id="10_hitbx"]
 [ext_resource type="Script" path="res://Player/Scripst/player_camera.gd" id="11_camra"]
+[ext_resource type="AudioStream" path="res://Assets/hit_player.wav" id="12_hurts"]
 
 [sub_resource type="CircleShape2D" id="CircleShape2D_o7al3"]
 
@@ -480,6 +481,10 @@ editor_draw_screen = true
 [node name="AudioStreamPlayer2D" type="AudioStreamPlayer2D" parent="Audio" unique_id=1868453720]
 stream = ExtResource("8_0n3k5")
 volume_db = -5.0
+
+[node name="HurtAudioStreamPlayer2D" type="AudioStreamPlayer2D" parent="Audio"]
+stream = ExtResource("12_hurts")
+volume_db = -4.0
 
 [node name="AnimationPlayer" type="AnimationPlayer" parent="." unique_id=1833066837]
 libraries/ = SubResource("AnimationLibrary_hqtel")

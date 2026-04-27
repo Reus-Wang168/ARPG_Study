@@ -5,11 +5,13 @@ const HitBoxScript = preload("res://GeneralNodes/HitBox/hit_box.gd")
 const HurtBoxScript = preload("res://GeneralNodes/HitBox/hurt_box.gd")
 
 signal hit_received(hit_box: HitBoxScript)
+signal health_changed(current_health: int, max_health: int)
 
 var cardinal_direction: Vector2 = Vector2.DOWN
 var direction: Vector2 = Vector2.ZERO
 var move_speed: float = 300.0
 
+@export var max_health: int = 3
 @export var shadow_walk_scale_delta: Vector2 = Vector2(0.08, 0.08)
 @export var shadow_walk_position_delta: Vector2 = Vector2(0.0, 1.2)
 @export var shadow_walk_alpha_delta: float = 0.08
@@ -17,8 +19,7 @@ var move_speed: float = 300.0
 @export var hurt_knockback_speed: float = 260.0
 @export var hurt_knockback_friction: float = 1800.0
 @export var hurt_invulnerability_duration: float = 0.45
-@export var hurt_flash_interval: float = 0.06
-@export var hurt_flash_color: Color = Color(1.6, 1.6, 1.6, 1.0)
+@export_range(0.0, 1.0, 0.01) var hurt_invulnerability_alpha_scale: float = 0.45
 
 @onready var state_machine: PlayerStateMachine = $StateMachine
 
@@ -30,6 +31,7 @@ var move_speed: float = 300.0
 @onready var attack_hit_box: HitBoxScript = get_node_or_null("AttackEffectPivot/AttackHitBox") as HitBoxScript
 @onready var attack_effect_sprite: Sprite2D = get_node_or_null("AttackEffectPivot/AttackEffectSprite") as Sprite2D
 @onready var attack_audio_player: AudioStreamPlayer2D = get_node_or_null("Audio/AudioStreamPlayer2D") as AudioStreamPlayer2D
+@onready var hurt_audio_player: AudioStreamPlayer2D = get_node_or_null("Audio/HurtAudioStreamPlayer2D") as AudioStreamPlayer2D
 
 var shadow_base_position: Vector2 = Vector2.ZERO
 var shadow_base_scale: Vector2 = Vector2.ONE
@@ -37,7 +39,7 @@ var shadow_base_alpha: float = 1.0
 var shadow_visual_time: float = 0.0
 var hurt_knockback_velocity: Vector2 = Vector2.ZERO
 var hurt_invulnerability_remaining: float = 0.0
-var hurt_flash_elapsed: float = 0.0
+var current_health: int = 0
 var sprite_base_modulate: Color = Color.WHITE
 
 
@@ -47,6 +49,7 @@ var jump_force: float = 600.0
 # Called when the node enters the scene tree for the first time.
 func _ready():
 	add_to_group("player")
+	current_health = max_health
 	if sprite_2d != null:
 		sprite_base_modulate = sprite_2d.modulate
 
@@ -66,6 +69,7 @@ func _ready():
 	ApplyHurtVisuals()
 	UpdateAnimation()
 	UpdateShadow(0.0)
+	EmitHealthChanged()
 
 
 func _physics_process(delta: float) -> void:
@@ -154,11 +158,33 @@ func PlayAttackSound() -> void:
 	attack_audio_player.play()
 
 
+func PlayHurtSound() -> void:
+	if hurt_audio_player == null:
+		return
+
+	if hurt_audio_player.is_playing():
+		hurt_audio_player.stop()
+
+	hurt_audio_player.play()
+
+
 func SetAttackHitBoxEnabled(enabled: bool) -> void:
 	if attack_hit_box == null:
 		return
 
 	attack_hit_box.SetActive(enabled)
+
+
+func GetCurrentHealth() -> int:
+	return current_health
+
+
+func GetMaxHealth() -> int:
+	return max_health
+
+
+func EmitHealthChanged() -> void:
+	health_changed.emit(current_health, max_health)
 
 
 func _on_hurt_box_hit_received(hit_box: HitBoxScript) -> void:
@@ -213,7 +239,6 @@ func UpdateAnimation() -> void:
 func UpdateHurtState(delta: float) -> void:
 	hurt_invulnerability_remaining = maxf(hurt_invulnerability_remaining - delta, 0.0)
 	if hurt_invulnerability_remaining > 0.0:
-		hurt_flash_elapsed += delta
 		ApplyHurtVisuals()
 		return
 
@@ -222,9 +247,11 @@ func UpdateHurtState(delta: float) -> void:
 
 
 func StartHurtReaction(hit_box: HitBoxScript) -> void:
+	current_health = maxi(current_health - hit_box.damage, 0)
+	EmitHealthChanged()
 	hurt_invulnerability_remaining = hurt_invulnerability_duration
-	hurt_flash_elapsed = 0.0
 	hurt_knockback_velocity = GetHurtKnockbackDirection(hit_box.global_position) * hurt_knockback_speed
+	PlayHurtSound()
 	ApplyHurtVisuals()
 
 	if IsAttacking():
@@ -247,8 +274,9 @@ func ApplyHurtVisuals() -> void:
 		sprite_2d.modulate = sprite_base_modulate
 		return
 
-	var flash_step: int = int(floor(hurt_flash_elapsed / maxf(hurt_flash_interval, 0.01)))
-	sprite_2d.modulate = hurt_flash_color if flash_step % 2 == 0 else sprite_base_modulate
+	var hurt_modulate: Color = sprite_base_modulate
+	hurt_modulate.a = clampf(sprite_base_modulate.a * hurt_invulnerability_alpha_scale, 0.0, 1.0)
+	sprite_2d.modulate = hurt_modulate
 
 
 func UpdateShadow(delta: float) -> void:

@@ -3,6 +3,9 @@
 [ext_resource type="PackedScene" uid="uid://ouo2ikrfxsie" path="res://Tile Maps/grass_01.tscn" id="1_41dhg"]
 [ext_resource type="PackedScene" uid="uid://bq24xgm7otwow" path="res://player.tscn" id="1_l5yja"]
 [ext_resource type="PackedScene" path="res://Enemy/Slime/slime.tscn" id="2_slime"]
+[ext_resource type="PackedScene" path="res://HUD/player_hud.tscn" id="3_hud"]
+[ext_resource type="AudioStream" path="res://Assets/example_music/example_music_01.ogg" id="4_bgm"]
+[ext_resource type="Script" path="res://GeneralNodes/Audio/looping_bgm_player.gd" id="5_bgm_script"]
 
 [node name="PlayerGround" type="Node2D" unique_id=110350172]
 
@@ -22,3 +25,11 @@ position = Vector2(336, 132)
 
 [node name="SlimeTop" parent="." instance=ExtResource("2_slime")]
 position = Vector2(256, 68)
+
+[node name="PlayerHud" parent="." instance=ExtResource("3_hud")]
+
+[node name="BgmPlayer" type="AudioStreamPlayer" parent="."]
+stream = ExtResource("4_bgm")
+volume_db = -12.0
+autoplay = true
+script = ExtResource("5_bgm_script")

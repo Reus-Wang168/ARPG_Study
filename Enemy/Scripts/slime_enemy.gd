@@ -10,6 +10,8 @@ const HurtBoxScript = preload("res://GeneralNodes/HitBox/hurt_box.gd")
 @export var hop_cooldown: float = 0.65
 @export var chase_range: float = 220.0
 @export var attack_range: float = 28.0
+@export var attack_pattern_range: float = 96.0
+@export var attack_axis_hop_count: int = 3
 @export var hop_stop_distance: float = 20.0
 @export var home_return_tolerance: float = 8.0
 @export var separation_radius: float = 34.0
@@ -22,11 +24,14 @@ const HurtBoxScript = preload("res://GeneralNodes/HitBox/hurt_box.gd")
 @export var hit_flash_color: Color = Color(1.35, 0.8, 0.8, 1.0)
 @export var idle_animation_name: StringName = &"idle"
 @export var hop_animation_name: StringName = &"hop"
+@export var death_animation_name: StringName = &"death"
 
 @onready var sprite_2d: Sprite2D = get_node_or_null("Sprite2D") as Sprite2D
 @onready var shadow_sprite_2d: Sprite2D = get_node_or_null("ShadowSprite2D") as Sprite2D
+@onready var destroy_smoke_sprite_2d: Sprite2D = get_node_or_null("DestroySmokeSprite2D") as Sprite2D
 @onready var hurt_box: HurtBoxScript = get_node_or_null("HurtBox") as HurtBoxScript
 @onready var attack_hit_box: HitBoxScript = get_node_or_null("AttackHitBox") as HitBoxScript
+@onready var collision_shape_2d: CollisionShape2D = get_node_or_null("CollisionShape2D") as CollisionShape2D
 @onready var animation_player: AnimationPlayer = get_node_or_null("AnimationPlayer") as AnimationPlayer
 
 var current_health: int = 0
@@ -41,6 +46,11 @@ var hit_flash_remaining: float = 0.0
 var sprite_base_modulate: Color = Color.WHITE
 var home_position: Vector2 = Vector2.ZERO
 var attack_is_active: bool = false
+var attack_pattern_active: bool = false
+var attack_axis_is_horizontal: bool = true
+var attack_hops_on_current_axis: int = 0
+var attack_direction_sign: int = 1
+var is_dying: bool = false
 
 
 func _ready() -> void:
@@ -58,11 +68,21 @@ func _ready() -> void:
 		attack_hit_box.damage = contact_damage
 		attack_hit_box.SetActive(false)
 
+	if destroy_smoke_sprite_2d != null:
+		destroy_smoke_sprite_2d.visible = false
+
+	if animation_player != null and not animation_player.animation_finished.is_connected(_on_animation_player_animation_finished):
+		animation_player.animation_finished.connect(_on_animation_player_animation_finished)
+
 	ResolveTarget()
 	PlayAnimation(idle_animation_name)
 
 
 func _physics_process(delta: float) -> void:
+	if is_dying:
+		velocity = Vector2.ZERO
+		return
+
 	if target == null or not is_instance_valid(target):
 		ResolveTarget()
 
@@ -71,6 +91,7 @@ func _physics_process(delta: float) -> void:
 	UpdateHitFlash(delta)
 
 	var movement_velocity: Vector2 = Vector2.ZERO
+	var used_hop_movement: bool = false
 
 	if hit_stun_remaining > 0.0:
 		SetAttackActive(false)
@@ -78,6 +99,7 @@ func _physics_process(delta: float) -> void:
 		if hop_time_remaining > 0.0:
 			hop_time_remaining = maxf(hop_time_remaining - delta, 0.0)
 			movement_velocity = hop_direction * hop_speed
+			used_hop_movement = true
 			PlayAnimation(hop_animation_name, false, GetHopAnimationSpeed())
 			if hop_time_remaining <= 0.0:
 				SetAttackActive(false)
@@ -97,6 +119,8 @@ func _physics_process(delta: float) -> void:
 
 	UpdateVisuals()
 	move_and_slide()
+	if used_hop_movement:
+		HandleHopCollision()
 
 
 func ResolveTarget() -> void:
@@ -120,11 +144,17 @@ func TryStartHop() -> void:
 
 	var goal_position: Vector2 = GetGoalPosition()
 	if goal_position == Vector2.INF:
+		ResetAttackPattern()
 		return
 
 	var goal_stop_distance: float = GetGoalStopDistance(goal_position)
 	var to_target: Vector2 = goal_position - global_position
 	var distance_to_target: float = to_target.length()
+	if ShouldUseAttackPattern(goal_position, distance_to_target):
+		StartAttackPatternHop(to_target)
+		return
+
+	ResetAttackPattern()
 	if distance_to_target <= goal_stop_distance:
 		return
 
@@ -132,13 +162,98 @@ func TryStartHop() -> void:
 	if travel_distance <= 0.0:
 		return
 
-	hop_direction = GetSeparatedDirection(to_target.normalized(), goal_position != home_position)
+	hop_direction = GetAxisAlignedDirection(
+		GetSeparatedDirection(to_target.normalized(), goal_position != home_position)
+	)
 	hop_time_remaining = minf(hop_duration, travel_distance / hop_speed)
 	if hop_time_remaining <= 0.0:
 		return
 	hop_cooldown_remaining = hop_cooldown
 	PlayAnimation(hop_animation_name, true, GetHopAnimationSpeed())
 	UpdateContactDamageState()
+
+
+func ShouldUseAttackPattern(goal_position: Vector2, distance_to_target: float) -> bool:
+	if goal_position == home_position:
+		return false
+
+	return distance_to_target <= attack_pattern_range
+
+
+func StartAttackPatternHop(to_target: Vector2) -> void:
+	if hop_duration <= 0.0:
+		return
+
+	if not attack_pattern_active:
+		attack_pattern_active = true
+		attack_axis_is_horizontal = true
+		attack_hops_on_current_axis = 0
+		attack_direction_sign = GetAxisDirectionSign(to_target.x, 1)
+	elif attack_hops_on_current_axis >= attack_axis_hop_count:
+		attack_axis_is_horizontal = not attack_axis_is_horizontal
+		attack_hops_on_current_axis = 0
+		attack_direction_sign = GetAxisDirectionSign(GetAttackAxisDelta(to_target), attack_direction_sign)
+
+	hop_direction = GetAttackPatternDirection()
+	hop_time_remaining = hop_duration
+	hop_cooldown_remaining = hop_cooldown
+	attack_hops_on_current_axis += 1
+	PlayAnimation(hop_animation_name, true, GetHopAnimationSpeed())
+	UpdateContactDamageState()
+
+
+func ResetAttackPattern() -> void:
+	attack_pattern_active = false
+	attack_axis_is_horizontal = true
+	attack_hops_on_current_axis = 0
+	attack_direction_sign = 1
+
+
+func GetAttackPatternDirection() -> Vector2:
+	if attack_axis_is_horizontal:
+		return Vector2(float(attack_direction_sign), 0.0)
+
+	return Vector2(0.0, float(attack_direction_sign))
+
+
+func GetAttackAxisDelta(direction: Vector2) -> float:
+	if attack_axis_is_horizontal:
+		return direction.x
+
+	return direction.y
+
+
+func GetAxisAlignedDirection(direction: Vector2) -> Vector2:
+	if direction.length_squared() <= 0.0001:
+		return Vector2.ZERO
+
+	if absf(direction.x) >= absf(direction.y):
+		return Vector2.RIGHT if direction.x >= 0.0 else Vector2.LEFT
+
+	return Vector2.DOWN if direction.y >= 0.0 else Vector2.UP
+
+
+func GetAxisDirectionSign(axis_delta: float, fallback: int = 1) -> int:
+	if axis_delta > 0.001:
+		return 1
+	if axis_delta < -0.001:
+		return -1
+
+	return fallback if fallback != 0 else 1
+
+
+func HandleHopCollision() -> void:
+	for collision_index in range(get_slide_collision_count()):
+		var collision: KinematicCollision2D = get_slide_collision(collision_index)
+		if collision == null:
+			continue
+		if collision.get_normal().dot(hop_direction) >= -0.35:
+			continue
+
+		hop_time_remaining = 0.0
+		if attack_pattern_active:
+			attack_direction_sign = -GetAxisDirectionSign(GetAttackAxisDelta(hop_direction), attack_direction_sign)
+		break
 
 
 func SetAttackActive(active: bool) -> void:
@@ -272,13 +387,60 @@ func ApplyHitReaction(from_global_position: Vector2) -> void:
 		sprite_2d.modulate = hit_flash_color
 
 
+func StartDeathSequence() -> void:
+	if is_dying:
+		return
+
+	is_dying = true
+	hop_time_remaining = 0.0
+	hop_cooldown_remaining = 0.0
+	hit_stun_remaining = 0.0
+	hit_flash_remaining = 0.0
+	knockback_velocity = Vector2.ZERO
+	velocity = Vector2.ZERO
+	ResetAttackPattern()
+	SetAttackActive(false)
+
+	if collision_shape_2d != null:
+		collision_shape_2d.set_deferred("disabled", true)
+
+	if hurt_box != null:
+		hurt_box.set_deferred("monitoring", false)
+		hurt_box.set_deferred("monitorable", false)
+		if hurt_box.collision_shape != null:
+			hurt_box.collision_shape.set_deferred("disabled", true)
+
+	if destroy_smoke_sprite_2d != null:
+		destroy_smoke_sprite_2d.frame = 0
+		destroy_smoke_sprite_2d.visible = true
+
+	if sprite_2d != null:
+		sprite_2d.modulate = sprite_base_modulate
+
+	if animation_player != null and animation_player.has_animation(String(death_animation_name)):
+		PlayAnimation(death_animation_name, true, 1.0)
+		return
+
+	queue_free()
+
+
 func _on_hurt_box_hit_received(hit_box: HitBoxScript) -> void:
+	if is_dying:
+		return
+
 	current_health -= hit_box.damage
+	if current_health <= 0:
+		StartDeathSequence()
+		return
+
 	ApplyHitReaction(hit_box.global_position)
 	if animation_player != null and animation_player.has_animation(String(hop_animation_name)):
 		animation_player.play(String(hop_animation_name), -1.0, GetHopAnimationSpeed() * 1.1, true)
 		active_animation_name = hop_animation_name
-	if current_health > 0:
+
+
+func _on_animation_player_animation_finished(animation_name: StringName) -> void:
+	if not is_dying or animation_name != death_animation_name:
 		return
 
 	queue_free()
